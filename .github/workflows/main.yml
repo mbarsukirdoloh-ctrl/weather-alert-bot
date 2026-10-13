@@ -1,0 +1,30 @@
+name: Check Rain Forecast
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-weather-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+           python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run weather script
+        env:
+           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+           LATITUDE: ${{ secrets.LATITUDE }}
+           LONGITUDE: ${{ secrets.LONGITUDE }}
+        run: python weather_alert.py
