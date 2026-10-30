@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import datetime
 
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 LATITUDE = os.environ.get("LATITUDE")
@@ -7,7 +8,7 @@ LONGITUDE = os.environ.get("LONGITUDE")
 LINE_ACCESS_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 
-def send_line_notify(message):
+def send_line_messages(messages_payload):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Content-Type": "application/json",
@@ -15,7 +16,7 @@ def send_line_notify(message):
     }
     data = {
         "to": LINE_USER_ID,
-        "messages": [{"type": "text", "text": message}]
+        "messages": messages_payload
     }
     response = requests.post(url, headers=headers, json=data)
     print("LINE API Response:", response.status_code, response.text)
@@ -26,11 +27,15 @@ def check_forecast_weather():
     try:
         response = requests.get(url)
         data = response.json()
+        
+        messages_to_send = []
+        
         if response.status_code == 200:
             city_name = data["city"]["name"]
             forecast_list = data["list"][:3]
             rain_alert_triggered = False
             alert_messages = []
+            
             for item in forecast_list:
                 dt_txt = item["dt_txt"]
                 weather_desc = item["weather"][0]["description"]
@@ -40,16 +45,25 @@ def check_forecast_weather():
                     rain_alert_triggered = True
                     alert_messages.append(f"⏰ เวลา {dt_txt}\n🌧️ {weather_desc} (โอกาสฝนตก {pop:.0f}%)\n🌡️ อุณหภูมิ: {temp}°C")
             
-            # ทดสอบส่งข้อความแจ้งเตือนหรือดึง User ID
             if rain_alert_triggered:
                 msg = f"⚠️ แจ้งเตือนพยากรณ์ฝนล่วงหน้า!\n📍 พื้นที่: {city_name}\n\n" + "\n\n".join(alert_messages)
-                send_line_notify(msg)
+                messages_to_send.append({"type": "text", "text": msg})
             else:
-                # ส่งข้อความสถานะปกติไปก่อนเพื่อให้แน่ใจว่าบอทส่งหาเราได้สำเร็จ
-                send_line_notify(f"🤖 บอทรายงานตัวครับ: พื้นที่ {city_name} ช่วงนี้ไม่มีพยากรณ์ฝนตกใน 9 ชม. นี้ แต่ระบบทำงานปกติครับ!")
-                print("ส่งข้อความสถานะปกติเข้า LINE เรียบร้อยแล้ว")
-        else:
-            print("ไม่สามารถดึงข้อมูลได้:", data.get("message"))
+                messages_to_send.append({"type": "text", "text": f"🤖 รายงานสภาพอากาศ: พื้นที่ {city_name} ปกติดีครับ ระบบทำงาน 24/7"})
+        
+        # ใส่ลิงก์เรดาร์สถานีสงขลา (sgk.jpg) พร้อม Timestamp สำหรับดึงภาพเรียลไทม์
+        current_time_stamp = int(datetime.now().timestamp())
+        radar_url = f"https://weather.tmd.go.th/sgk.jpg?t={current_time_stamp}"
+        
+        messages_to_send.append({
+            "type": "image",
+            "originalContentUrl": radar_url,
+            "previewImageUrl": radar_url
+        })
+        
+        # ส่งข้อความและรูปภาพเรดาร์เข้า LINE พร้อมกัน
+        send_line_messages(messages_to_send)
+        
     except Exception as e:
         print("เกิดข้อผิดพลาด:", e)
 
